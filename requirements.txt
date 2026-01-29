@@ -1,0 +1,19 @@
+fastapi==0.112.2
+uvicorn[standard]==0.40.0
+pydantic==2.9.2
+pydantic-settings==2.6.1
+SQLAlchemy==2.0.36
+asyncmy==0.2.9
+neo4j==5.23.0
+python-multipart==0.0.9
+
+# Milvus
+pymilvus==2.4.9
+
+# Document Parsers
+python-magic-bin==0.4.14
+python-docx==1.1.2
+pypdf==4.3.1
+
+# LLM / Embeddings
+openai==1.37.0
