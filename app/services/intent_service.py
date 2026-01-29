@@ -3,6 +3,7 @@ import uuid
 from typing import List, Dict
 from openai import OpenAI
 from app.core.config import settings
+from app.core.prompts import PromptTemplates
 
 class IntentService:
     def __init__(self):
@@ -13,30 +14,8 @@ class IntentService:
         Analyzes the requirement content to identify testing intents.
         Returns a list of intents with intent_id, description, and scope.
         """
-        prompt = f"""
-        Analyze the following requirement document and identify the key testing intents.
-        A testing intent is a high-level goal or objective for testing, such as "verifying a core function", "testing for a specific type of error", or "checking performance under load".
+        prompt = PromptTemplates.get_intent_analysis_prompt(requirement_content)
 
-        For each intent, provide a short description and categorize its scope (e.g., "functional", "exception", "risk", "boundary").
-
-        Format the output as a single JSON object with a key "intents".
-        - "intents": A list of objects, each with "description" and "scope".
-
-        Example Output:
-        {{
-          "intents": [
-            {{"description": "Verify that users can successfully log in with valid credentials.", "scope": "functional"}},
-            {{"description": "Test how the system handles login attempts with invalid passwords.", "scope": "exception"}},
-            {{"description": "Assess the login response time under high user concurrency.", "scope": "risk"}}
-          ]
-        }}
-
-        Requirement Content:
-        ---
-        {requirement_content}
-        ---
-        """
-        
         response = self.openai_client.chat.completions.create(
             model=settings.openai_model,
             messages=[{"role": "user", "content": prompt}],

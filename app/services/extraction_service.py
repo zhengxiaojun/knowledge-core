@@ -3,6 +3,7 @@ import json
 from typing import Dict
 from openai import OpenAI
 from app.core.config import settings
+from app.core.prompts import PromptTemplates
 from app.services.graph_service import GraphService
 from app.services.milvus_service import MilvusService
 
@@ -13,37 +14,13 @@ class ExtractionService:
         self.openai_client = OpenAI(api_key=settings.openai_api_key)
 
     def _call_llm_for_extraction(self, text: str) -> Dict:
-        # ... (LLM call remains the same)
-        prompt = f"""
-        Based on the following text, identify and extract key testing knowledge units.
-        These units can be Test Points, Test Scenarios, or Risks.
-        Also, identify the relationships between them.
+        prompt = PromptTemplates.get_knowledge_extraction_prompt(text)
 
-        Format the output as a single JSON object with two keys: "nodes" and "edges".
-        - "nodes": A list of objects, each with "id" (a temporary unique ID), "type", and "content".
-        - "edges": A list of objects, each with "source" (source node's temp ID), "target" (target node's temp ID), and "relation" (e.g., "RELATES_TO", "CONTAINS").
-
-        Example Output:
-        {{
-          "nodes": [
-            {{"id": "temp-1", "type": "TestPoint", "content": "User login functionality"}},
-            {{"id": "temp-2", "type": "TestScenario", "content": "Login with valid credentials"}}
-          ],
-          "edges": [
-            {{"source": "temp-1", "target": "temp-2", "relation": "CONTAINS"}}
-          ]
-        }}
-
-        Text to analyze:
-        ---
-        {text}
-        ---
-        """
-        
         response = self.openai_client.chat.completions.create(
-            model="gpt-4-turbo",
+            model=settings.openai_model,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
+            temperature=settings.llm_temperature
         )
         
         return json.loads(response.choices[0].message.content)

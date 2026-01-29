@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.api import requirements, knowledge, graph, testcases, tasks, testpoints
+from app.api import requirements, knowledge, graph, testcases, tasks, testpoints, data_import
 from app.models.sql_models import init_db
 from app.core.config import settings
 from app.core.dependencies import cleanup_services
@@ -32,6 +32,9 @@ app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
 app.include_router(testpoints.router, prefix="/api/testpoints", tags=["Test Points"])
 app.include_router(testcases.router, prefix="/api/testcases", tags=["Test Cases"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
+app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
+app.include_router(data_import.router, prefix="/api/data", tags=["Data Import"])
+app.include_router(statistics.router, prefix="/api/statistics", tags=["Statistics"])
 
 @app.get("/")
 def read_root():

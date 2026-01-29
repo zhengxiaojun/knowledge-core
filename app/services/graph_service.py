@@ -9,6 +9,22 @@ class GraphService:
             auth=(settings.neo4j_user, settings.neo4j_password)
         )
         print("Successfully connected to Neo4j.")
+        self._init_indexes()
+
+    def _init_indexes(self):
+        """Initialize Neo4j indexes for better query performance."""
+        try:
+            indexes = [
+                "CREATE INDEX IF NOT EXISTS FOR (n:Requirement) ON (n.id)",
+                "CREATE INDEX IF NOT EXISTS FOR (n:TestPoint) ON (n.id)",
+                "CREATE INDEX IF NOT EXISTS FOR (n:TestCase) ON (n.id)",
+                "CREATE INDEX IF NOT EXISTS FOR (n:Defect) ON (n.id)"
+            ]
+            for index_query in indexes:
+                self._execute_query(index_query)
+            print("Neo4j indexes initialized successfully.")
+        except Exception as e:
+            print(f"Warning: Failed to initialize indexes: {e}")
 
     def close(self):
         self._driver.close()

@@ -325,6 +325,7 @@ def confirm_test_cases(
 ):
     """
     Confirm generated test cases with optional modifications.
+    Confirmed cases will trigger knowledge feedback.
     """
     confirmed_count = 0
     failed_cases = []
@@ -349,6 +350,15 @@ def confirm_test_cases(
             # Update status to confirmed
             test_case.status = sql_models.TestCaseStatusEnum.CONFIRMED
             db.commit()
+
+            # Trigger knowledge feedback
+            try:
+                from app.services.knowledge_feedback_service import KnowledgeFeedbackService
+                feedback_service = KnowledgeFeedbackService(db)
+                feedback_service.feedback_from_confirmed_testcase(case_id)
+            except Exception as e:
+                print(f"Knowledge feedback failed for case {case_id}: {e}")
+
             confirmed_count += 1
 
         except Exception as e:
