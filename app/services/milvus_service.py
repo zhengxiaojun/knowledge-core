@@ -58,8 +58,11 @@ class MilvusService:
         self.collection.load()
         print("Collection loaded into memory.")
 
-    def _get_embedding(self, text: str, model="text-embedding-3-small") -> List[float]:
-        response = self.openai_client.embeddings.create(input=[text], model=model)
+    def _get_embedding(self, text: str) -> List[float]:
+        response = self.openai_client.embeddings.create(
+            input=[text],
+            model=self.embedding_model
+        )
         return response.data[0].embedding
 
     def upsert(self, data: List[Dict]) -> Dict:

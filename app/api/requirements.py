@@ -1,7 +1,9 @@
 from typing import List
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, UploadFile, File, Form
 from sqlalchemy.orm import Session
 import uuid
+import os
+from pathlib import Path
 
 from app.models import sql_models
 from app.schemas import requirement_schema, knowledge_base_schema
@@ -9,6 +11,7 @@ from app.models.sql_models import get_db, StatusEnum, SessionLocal
 from app.core.response import Success, Fail
 from app.services.extraction_service import ExtractionService
 from app.services.intent_service import IntentService
+from app.services.parser import DocumentParser
 
 router = APIRouter()
 
@@ -40,6 +43,70 @@ def run_extraction_in_background(
         print(f"Extraction failed for KB {knowledge_base_id}: {e}")
     finally:
         db.close()
+
+
+@router.post("/upload")
+async def upload_requirement(
+    *,
+    db: Session = Depends(get_db),
+    project_id: str = Form(...),
+    input_type: str = Form(...),
+    files: List[UploadFile] = File(...)
+):
+    """
+    Upload requirement documents (supports text, Word, PDF, Excel, image)
+    """
+    if input_type not in ["text", "doc", "pdf", "excel", "image"]:
+        return Fail(message="Invalid input_type. Must be one of: text, doc, pdf, excel, image", code=40001)
+
+    # Create upload directory if it doesn't exist
+    upload_dir = Path("uploads") / project_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    parser = DocumentParser()
+    parsed_content = ""
+    source_files = []
+
+    for file in files:
+        # Save file
+        file_path = upload_dir / file.filename
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+
+        source_files.append(file.filename)
+
+        # Parse content based on type
+        try:
+            if input_type == "text":
+                parsed_content += content.decode("utf-8") + "\n"
+            elif input_type in ["doc", "docx"]:
+                parsed_content += parser.parse_word(str(file_path)) + "\n"
+            elif input_type == "pdf":
+                parsed_content += parser.parse_pdf(str(file_path)) + "\n"
+            elif input_type == "excel":
+                parsed_content += parser.parse_excel(str(file_path)) + "\n"
+            elif input_type == "image":
+                # For images, save path for future OCR processing
+                parsed_content += f"[Image: {file.filename}]\n"
+        except Exception as e:
+            return Fail(message=f"Failed to parse file {file.filename}: {str(e)}", code=50001)
+
+    # Create requirement_raw entry
+    db_req_raw = sql_models.RequirementRaw(
+        title=f"Requirement from {input_type}",
+        full_content=parsed_content,
+        source_type=input_type,
+        source_file=", ".join(source_files)
+    )
+    db.add(db_req_raw)
+    db.commit()
+    db.refresh(db_req_raw)
+
+    return Success(data={
+        "requirement_id": str(db_req_raw.id),
+        "raw_chunks": len(source_files)
+    })
 
 
 @router.post("/")
@@ -76,6 +143,18 @@ def read_requirement(
     db: Session = Depends(get_db),
     requirement_id: int,
 ):
+    # Try to get from requirement_raw first
+    requirement = db.query(sql_models.RequirementRaw).filter(sql_models.RequirementRaw.id == requirement_id).first()
+    if requirement:
+        return Success(data={
+            "requirement_id": requirement.id,
+            "title": requirement.title,
+            "full_content": requirement.full_content,
+            "source_type": requirement.source_type,
+            "created_at": requirement.created_at.isoformat() if requirement.created_at else None
+        })
+
+    # Fallback to legacy table
     requirement = db.query(sql_models.Requirement).filter(sql_models.Requirement.id == requirement_id).first()
     if not requirement:
         return Fail(message="Requirement not found", code=40401, status_code=404)
@@ -125,14 +204,20 @@ def analyze_intent(
     *,
     db: Session = Depends(get_db),
     requirement_id: int,
-    intent_service: IntentService = Depends(IntentService)
+    intent_service: IntentService = Depends(get_intent_service)
 ):
-    requirement = db.query(sql_models.Requirement).filter(sql_models.Requirement.id == requirement_id).first()
+    # Try requirement_raw first
+    requirement = db.query(sql_models.RequirementRaw).filter(sql_models.RequirementRaw.id == requirement_id).first()
+    if not requirement:
+        # Fallback to legacy table
+        requirement = db.query(sql_models.Requirement).filter(sql_models.Requirement.id == requirement_id).first()
+
     if not requirement:
         return Fail(message="Requirement not found", code=40401, status_code=404)
     
     try:
-        intents = intent_service.analyze(requirement.description)
+        content = requirement.full_content if hasattr(requirement, 'full_content') else requirement.description
+        intents = intent_service.analyze(content)
         return Success(data=intents)
     except Exception as e:
         return Fail(message=f"Intent analysis failed: {str(e)}")

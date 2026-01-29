@@ -58,9 +58,11 @@ class GenerationService:
             """
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4-turbo",
+                model=settings.openai_model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
+                temperature=settings.llm_temperature,
+                max_tokens=settings.llm_max_tokens
             )
             
             test_case_data = json.loads(response.choices[0].message.content)

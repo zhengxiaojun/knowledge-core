@@ -19,7 +19,7 @@ class SearchResult(BaseModel):
 @router.post("/search")
 def search(
     req: SearchRequest,
-    retrieval_service: RetrievalService = Depends(RetrievalService),
+    retrieval_service: RetrievalService = Depends(get_retrieval_service),
 ):
     """
     Based on semantic similarity, retrieve test knowledge.

@@ -28,7 +28,7 @@ class Subgraph(BaseModel):
 @router.post("/expand")
 def expand_graph(
     req: GraphExpandRequest,
-    graph_service: GraphService = Depends(GraphService),
+    graph_service: GraphService = Depends(get_graph_service),
 ):
     """
     From the test knowledge node, expand the relevant subgraph.
